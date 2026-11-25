@@ -19,10 +19,11 @@ const unread = () => S.notes.filter((n) => n.uid === me.id && !n.read).length;
 
 function landing() {
   $("#app").innerHTML = `<div class="nav">${logo()}<div><a class="btn g s" href="#/login">Sign In</a> <a class="btn s" href="#/register">Passenger Register</a></div></div>
-  <section class="hero"><div><span class="pill">✦ Intelligent Bus Reservation Platform</span>
-  <h1>Smart Travel. Zero Queues. <span>Effortless Bus Booking.</span></h1>
-  <p>The next-generation digital reservation platform for bus operators and passengers. Live seat maps, instant tickets, transparent refunds and real-time operator analytics.</p>
-  <a class="btn" href="#/login">Launch Passenger Portal →</a><a class="btn w" href="#/login">Admin Management Console</a></div>
+  <div class="live-route-ticker"><span><i></i> LIVE ROUTES</span><div><b>Bengaluru → Mysuru</b><b>Mysuru → Bengaluru</b><b>Bengaluru → Goa</b><b>Chennai → Bengaluru</b></div></div>
+  <section class="hero"><div><span class="pill">✦ Your journey, reimagined</span>
+  <h1>Where every mile feels <span>effortless.</span></h1>
+  <p>Find the right bus, choose your perfect seat, and move with confidence. BUS BUDDY brings routes, tickets and live availability into one beautifully simple journey.</p>
+  <div class="hero-actions"><a class="btn" href="#/login">Find your ride <b>→</b></a><a class="btn w" href="#/login">Operator console</a></div></div>
   <div class="bus-hero" aria-label="BUS BUDDY premium bus illustration"><div class="sun-disc"></div><div class="city city-one"></div><div class="city city-two"></div><div class="floating-status live"><i></i><b>Live availability</b><span>12 seats open</span></div><div class="floating-status arrival"><span>Next departure</span><b>06:00 AM</b></div><div class="road"><div class="road-line"></div></div><div class="hero-bus"><div class="bus-roof"><span>BUS BUDDY</span></div><div class="bus-glass"><i></i><i></i><i></i><i></i><i></i></div><div class="bus-door"><span></span></div><div class="bus-light left"></div><div class="bus-light right"></div><div class="wheel wheel-left"><i></i></div><div class="wheel wheel-right"><i></i></div></div><div class="route-pin pin-start">BLR</div><div class="route-pin pin-end">MYR</div></div></section>
   <div class="destination-heading"><span>EXPLORE INDIA</span><h2>Popular places, ready to book</h2></div>
   <div class="destination-carousel"><button class="destination-arrow" data-act="destination-prev" aria-label="Previous destination">‹</button><div class="destination-grid">
