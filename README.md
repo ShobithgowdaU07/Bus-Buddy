@@ -5,6 +5,8 @@ A role-based web application for online bus seat booking (CSC203B Software Devel
 ## Features
 - **Passenger portal:** dashboard, search and book with a live seat map, my bookings, cancellation with 80% refund, notifications, profile
 - **Admin console:** operations overview with insights, manage buses, all bookings, reports and analytics (charts)
+- Bus types (Non-AC, AC, Volvo Multi-Axle) and seat types (Seater, Sleeper) with automatic fare calculation: base fare × bus multiplier × seat multiplier. Non-AC is 85%, AC 100%, Volvo 130%; Sleeper adds 40%.
+- 40 seats per bus, with AC/Non-AC filters in passenger bus search
 - Registration and login with role-based access (passwords stored as SHA-256 hashes)
 - Input validation and double-booking prevention
 - Pure HTML, CSS and JavaScript. No install and no server needed. Data is kept in the browser (localStorage).

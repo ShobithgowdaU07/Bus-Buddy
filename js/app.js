@@ -5,9 +5,18 @@ const inr = (n) => "₹" + Number(n).toLocaleString("en-IN");
 let S; try { S = JSON.parse(localStorage.getItem("rr_s")); } catch (e) {}
 if (!S || !S.users) S = RR.newState();
 const save = () => { try { localStorage.setItem("rr_s", JSON.stringify(S)); } catch (e) {} };
+if (!S.busCatalogVersion) {
+  S.buses.forEach((b) => { b.seats = Math.max(Number(b.seats) || 0, RR.DEFAULT_BUS_SEATS); });
+  if (!S.buses.some((b) => b.id === "B113")) {
+    S.buses.push({ id: "B113", from: "Bengaluru", to: "Mysuru", time: "07:00", fare: 350, seats: RR.DEFAULT_BUS_SEATS, type: "Non-AC" });
+  }
+  S.nb = Math.max(Number(S.nb) || 0, 114);
+  S.busCatalogVersion = 1;
+  save();
+}
 let me = null; try { me = S.users.find((u) => u.id == sessionStorage.getItem("rr_u")) || null; } catch (e) {}
 const tomorrow = () => new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-let sv = { from: "Bengaluru", to: "Mysuru", date: tomorrow(), bus: null, seat: null };
+let sv = { from: "Bengaluru", to: "Mysuru", date: tomorrow(), bus: null, seat: null, seatType: "Seater", busType: "Any" };
 const COL = ["#2563eb,#14b8a6", "#1d4ed8,#06b6d4", "#4f46e5,#0ea5e9", "#0f766e,#2dd4bf", "#1e40af,#38bdf8"];
 const BUS = (c) => `<svg viewBox="0 0 200 90" style="color:${c}"><rect x="4" y="10" width="190" height="55" rx="14" fill="currentColor"/>${[14, 50, 86, 122].map((x) => `<rect x="${x}" y="20" width="30" height="22" rx="4" fill="#dbeafe"/>`).join("")}<path d="M158 20h22a8 8 0 0 1 8 8v14h-30z" fill="#99f6e4"/><rect x="4" y="48" width="190" height="8" fill="#fff" opacity=".3"/><circle cx="48" cy="68" r="14" fill="#172033"/><circle cx="48" cy="68" r="6" fill="#cbd5e1"/><circle cx="150" cy="68" r="14" fill="#172033"/><circle cx="150" cy="68" r="6" fill="#cbd5e1"/></svg>`;
 const LOGO = `<svg width="38" height="38" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#fff" stroke="#dbeafe" stroke-width="2"/><circle cx="20" cy="20" r="11" fill="none" stroke="#2563eb" stroke-width="5"/><circle cx="20" cy="20" r="4" fill="#14b8a6"/></svg>`;
@@ -34,7 +43,7 @@ function landing() {
     <article class="destination-card" style="background-image:linear-gradient(180deg,rgba(15,23,42,.05),rgba(15,23,42,.78)),url('images/pune.jpg')"><div class="destination-tag">CITY BREAK</div><div class="destination-name"><b>Pune</b><span>Culture & cafés · from ₹1,250</span></div></article>
     <article class="destination-card" style="background-image:linear-gradient(180deg,rgba(15,23,42,.05),rgba(15,23,42,.78)),url('images/kochi.jpg')"><div class="destination-tag">COASTAL ROUTE</div><div class="destination-name"><b>Kochi</b><span>Queen of Arabian Sea · from ₹980</span></div></article>
   </div><button class="destination-arrow next" data-act="destination-next" aria-label="Next destination">›</button></div>
-  <div class="trust-row"><div><b>20+</b><span>Smart seats</span></div><div><b>80%</b><span>Quick refund</span></div><div><b>100%</b><span>Digital tickets</span></div><div><b>24/7</b><span>Trip access</span></div></div>
+  <div class="trust-row"><div><b>40+</b><span>Smart seats</span></div><div><b>80%</b><span>Quick refund</span></div><div><b>100%</b><span>Digital tickets</span></div><div><b>24/7</b><span>Trip access</span></div></div>
   <div class="feat">${[["⚡", "Instant e-tickets", "Your unique ticket is ready the moment you confirm."], ["💺", "Interactive seat map", "See seat availability clearly and avoid double booking."], ["↩️", "Smart 80% refund", "Cancel in one tap with a transparent refund estimate."], ["🎒", "One journey hub", "Bookings, alerts, profiles and trips in one place."]].map((f) => `<article class="card feature-card"><div class="feature-icon">${f[0]}</div><h3>${f[1]}</h3><p class="sub">${f[2]}</p></article>`).join("")}</div>
   <div class="journey-planner"><div class="planner-copy"><span>JOURNEY PLANNER</span><h2>Where will your next adventure begin?</h2><p>Compare popular routes and reserve the right seat in seconds.</p></div><div class="planner-route"><div><small>FROM</small><b>Bengaluru</b></div><div class="planner-arrow">→</div><div><small>TO</small><b>Mysuru</b></div><a class="btn" href="#/login">Plan journey</a></div></div>
   <div class="boarding-showcase"><div class="boarding-map"><div class="terminal terminal-a">A1</div><div class="terminal-line"><i></i><i></i><i></i></div><div class="terminal terminal-b">A5</div><div class="boarding-bus"><span>BUS BUDDY</span></div></div><div class="boarding-copy"><span>YOUR BOARDING, SIMPLIFIED</span><h2>From search to seat—<br><em>everything in one flow.</em></h2><div class="boarding-steps"><div><b>01</b><span><strong>Choose a route</strong><small>Pick your source and destination</small></span></div><div><b>02</b><span><strong>Select your seat</strong><small>View live availability</small></span></div><div><b>03</b><span><strong>Travel with ease</strong><small>Keep your digital ticket ready</small></span></div></div></div></div>`;
@@ -79,20 +88,20 @@ function pDash() {
     ${nextTrip ? `<div class="next-trip card"><div><span>NEXT JOURNEY</span><h3>${routeOf(nextTrip.bus)}</h3><p>${nextTrip.date} · Seat ${nextTrip.seat} · ${nextTrip.id}</p></div><a class="btn" href="#/p/bookings">View ticket →</a></div>` : ""}
     <div class="quick-actions"><a href="#/p/search" class="card"><span>＋</span><div><b>Book a ride</b><small>Find a bus and choose seats</small></div></a><a href="#/p/bookings" class="card"><span>🎟</span><div><b>View my tickets</b><small>Manage and track journeys</small></div></a><a href="#/p/notifications" class="card"><span>🔔</span><div><b>Trip updates</b><small>${unread()} unread notification${unread() === 1 ? "" : "s"}</small></div></a></div>
     <div class="card"><h3>Upcoming journeys</h3>${up.length ? `<div class="tbl"><table><tr><th>Ticket</th><th>Route</th><th>Date</th><th>Seat</th></tr>${up.map((b) => `<tr><td>${b.id}</td><td>${routeOf(b.bus)}</td><td>${b.date}</td><td>${b.seat}</td></tr>`).join("")}</table></div>` : `<p class="sub">No upcoming trips. <a href="#/p/search"><b>Book one now →</b></a></p>`}</div>
-    <h3 style="margin:6px 0 12px">Popular routes</h3><div class="routes">${S.buses.map((b, i) => `<div class="rt" style="background:linear-gradient(135deg,${COL[i % 5]})" data-act="route" data-f="${b.from}" data-t="${b.to}"><h3>${b.from} → ${b.to}</h3><small>Departs ${b.time} · from ${inr(b.fare)}</small>${BUS("#fff")}</div>`).join("")}</div>`;
+    <h3 style="margin:6px 0 12px">Popular routes</h3><div class="routes">${S.buses.map((b, i) => `<div class="rt" style="background:linear-gradient(135deg,${COL[i % 5]})" data-act="route" data-f="${b.from}" data-t="${b.to}"><h3>${b.from} → ${b.to}</h3><small>Departs ${b.time} · from ${inr(RR.fareFor(b, "Seater"))}</small>${BUS("#fff")}</div>`).join("")}</div>`;
 }
 
 function pSearch() {
   const cities = [...new Set(S.buses.flatMap((b) => [b.from, b.to]))].sort();
   const o = (v) => cities.map((c) => `<option ${c === v ? "selected" : ""}>${esc(c)}</option>`).join("");
   return head("Passenger portal", "Search & Book", "Find a bus, choose your seat and get your ticket instantly.") +
-    `<div class="card"><form class="row" data-form="search"><label>From<select name="from">${o(sv.from)}</select></label><label>To<select name="to">${o(sv.to)}</select></label><label>Date<input type="date" name="date" min="${RR.today()}" value="${sv.date}"></label><button class="btn">Search buses</button></form></div><div id="sres"></div><div id="sbox"></div>`;
+    `<div class="card"><form class="row" data-form="search"><label>From<select name="from">${o(sv.from)}</select></label><label>To<select name="to">${o(sv.to)}</select></label><label>Date<input type="date" name="date" min="${RR.today()}" value="${sv.date}"></label><label>Bus type<select name="busType"><option ${sv.busType === "Any" ? "selected" : ""}>Any</option><option ${sv.busType === "AC" ? "selected" : ""}>AC</option><option ${sv.busType === "Non-AC" ? "selected" : ""}>Non-AC</option></select></label><button class="btn">Search buses</button></form></div><div id="sres"></div><div id="sbox"></div>`;
 }
 
 function runSearch() {
   try {
-    const r = RR.search(S, sv.from, sv.to);
-    $("#sres").innerHTML = r.length ? r.map((b, i) => `<div class="card res">${BUS(["#2563eb", "#14b8a6", "#1d4ed8"][i % 3])}<div class="i"><h3>${esc(b.from)} → ${esc(b.to)}</h3><p class="sub" style="margin:4px 0">Departs ${b.time} · ${esc(b.type)} · ${b.seats - RR.taken(S, b.id, sv.date).length} seats left</p></div><div class="fare">${inr(b.fare)}</div><button class="btn" data-act="pick" data-id="${b.id}">Select seats</button></div>`).join("") : `<div class="card"><p class="sub">No buses found on this route.</p></div>`;
+    const r = RR.search(S, sv.from, sv.to, sv.busType);
+    $("#sres").innerHTML = r.length ? r.map((b, i) => `<div class="card res">${BUS(["#2563eb", "#14b8a6", "#1d4ed8"][i % 3])}<div class="i"><h3>${esc(b.from)} → ${esc(b.to)}</h3><p class="sub" style="margin:4px 0">Departs ${b.time} · ${esc(RR.busTypeOf(b))} · ${b.seats - RR.taken(S, b.id, sv.date).length} seats left</p></div><div class="fare">${inr(RR.fareFor(b, "Seater"))}<small class="sub fare-caption">from</small></div><button class="btn" data-act="pick" data-id="${b.id}">Select seats</button></div>`).join("") : `<div class="card"><p class="sub">No buses found on this route.</p></div>`;
   } catch (e) { $("#sres").innerHTML = `<div class="msg e">${esc(e.message)}</div>`; }
   drawBox();
 }
@@ -103,11 +112,11 @@ function drawBox(scroll) {
   const tk = RR.taken(S, b.id, sv.date); let h = "";
   for (let i = 1; i <= b.seats; i++) { h += `<button class="seat ${tk.includes(i) ? "x" : ""} ${sv.seat === i ? "sel" : ""}" ${tk.includes(i) ? "disabled" : ""} data-act="seat" data-n="${i}">${i}</button>`; if (i % 4 === 2) h += "<span></span>"; }
   el.innerHTML = `<div class="card"><h3>${esc(b.from)} → ${esc(b.to)} · ${sv.date}</h3><p class="sub" style="text-align:center;margin:10px 0 0">🚌 Front of the bus</p><div class="seats">${h}</div>
-  <form class="row" data-form="book"><label>Passenger name<input name="name" value="${esc(me.name)}" required></label><label>Phone<input name="phone" value="${esc(me.phone)}" maxlength="10" required></label><button class="btn">Confirm booking${sv.seat ? " · seat " + sv.seat : ""}</button></form><div id="bm"></div></div>`;
+  <form class="row" data-form="book"><label>Seat type<select name="seatType"><option ${sv.seatType === "Seater" ? "selected" : ""}>Seater</option><option ${sv.seatType === "Sleeper" ? "selected" : ""}>Sleeper</option></select></label><label>Passenger name<input name="name" value="${esc(me.name)}" required></label><label>Phone<input name="phone" value="${esc(me.phone)}" maxlength="10" required></label><div class="booking-total">Ticket price <b id="booking-fare">${inr(RR.fareFor(b, sv.seatType))}</b></div><button class="btn" id="confirm-booking">Confirm booking${sv.seat ? " · seat " + sv.seat : ""}</button></form><p class="sub fare-note">Fare is based on the bus type and seat type; sleeper seats cost more than seater seats.</p><div id="bm"></div></div>`;
   if (scroll) el.scrollIntoView({ behavior: "smooth" });
 }
 
-const bookTable = (list, admin) => `<div class="card tbl"><table><tr><th>Ticket</th>${admin ? "<th>Passenger</th>" : ""}<th>Route</th><th>Date</th><th>Seat</th><th>Fare</th><th>Status</th><th></th></tr>${list.length ? list.map((b) => `<tr><td>${b.id}</td>${admin ? `<td>${esc(b.name)}</td>` : ""}<td>${routeOf(b.bus)}</td><td>${b.date}</td><td>${b.seat}</td><td>${inr(b.fare)}</td><td>${status(b.status)}</td><td>${b.status === "CONFIRMED" ? `<button class="btn s g" data-act="cancel" data-id="${b.id}">Cancel</button>` : b.refund ? `Refund ${inr(b.refund)}` : ""}</td></tr>`).join("") : `<tr><td colspan="8">No bookings yet.</td></tr>`}</table><div id="cm"></div></div>`;
+const bookTable = (list, admin) => `<div class="card tbl"><table><tr><th>Ticket</th>${admin ? "<th>Passenger</th>" : ""}<th>Route</th><th>Date</th><th>Seat</th><th>Fare</th><th>Status</th><th></th></tr>${list.length ? list.map((b) => `<tr><td>${b.id}</td>${admin ? `<td>${esc(b.name)}</td>` : ""}<td>${routeOf(b.bus)}</td><td>${b.date}</td><td>${b.seat} · ${esc(b.seatType || "Seater")}</td><td>${inr(b.fare)}</td><td>${status(b.status)}</td><td>${b.status === "CONFIRMED" ? `<button class="btn s g" data-act="cancel" data-id="${b.id}">Cancel</button>` : b.refund ? `Refund ${inr(b.refund)}` : ""}</td></tr>`).join("") : `<tr><td colspan="8">No bookings yet.</td></tr>`}</table><div id="cm"></div></div>`;
 const pBook = () => head("Passenger portal", "My Bookings", "View your tickets and cancel for an 80% refund.") + bookTable(mine().slice().reverse(), false);
 const aBook = () => head("Admin console", "All Bookings", "Every ticket booked across all buses.") + bookTable(S.bookings.slice().reverse(), true);
 
@@ -127,12 +136,12 @@ function aDash() {
   return head("Admin console", "Operations Overview", "Real-time bookings, revenue and occupancy.") +
     `<div class="cards">${stat("Total bookings", t.total, t.confirmed + " confirmed")}${stat("Revenue", inr(t.revenue), "Confirmed fares")}${stat("Refunds", inr(t.refunds), t.cancelled + " cancellations")}${stat("Occupancy", t.occupancy + "%", "Across all buses")}</div>
     <div class="card"><h3>Insights</h3>${al.length ? al.map((a) => `<div class="note"><b>${a[1]}</b> <span class="tag2 new">${a[0]}</span><br>${a[2]}</div>`).join("") : '<p class="sub">No insights yet. Bookings will appear here.</p>'}</div>
-    <div class="card tbl"><h3>Fleet</h3><table><tr><th>Bus</th><th>Route</th><th>Departs</th><th>Fare</th></tr>${S.buses.map((b) => `<tr><td>${b.id}</td><td>${b.from} → ${b.to}</td><td>${b.time}</td><td>${inr(b.fare)}</td></tr>`).join("")}</table></div>`;
+    <div class="card tbl"><h3>Fleet</h3><table><tr><th>Bus</th><th>Route</th><th>Departs</th><th>Bus type</th><th>Seats</th><th>Base fare</th></tr>${S.buses.map((b) => `<tr><td>${b.id}</td><td>${b.from} → ${b.to}</td><td>${b.time}</td><td>${esc(RR.busTypeOf(b))}</td><td>${b.seats}</td><td>${inr(b.fare)}</td></tr>`).join("")}</table></div>`;
 }
 
 const aBuses = () => head("Admin console", "Manage Buses", "Add or remove buses. Passengers are notified of new buses.") +
-  `<div class="card"><form class="row" data-form="addbus"><label>From<input name="from" required></label><label>To<input name="to" required></label><label>Departure<input name="time" type="time" required></label><label>Fare (₹)<input name="fare" type="number" required></label><label>Type<select name="type"><option>AC Seater</option><option>AC Sleeper</option><option>Volvo Multi-Axle</option></select></label><button class="btn">Add bus</button></form><div id="am"></div></div>
-  <div class="card tbl"><table><tr><th>Bus</th><th>Route</th><th>Departs</th><th>Type</th><th>Fare</th><th></th></tr>${S.buses.map((b) => `<tr><td>${b.id}</td><td>${esc(b.from)} → ${esc(b.to)}</td><td>${b.time}</td><td>${esc(b.type)}</td><td>${inr(b.fare)}</td><td><button class="btn s g" data-act="delbus" data-id="${b.id}">Remove</button></td></tr>`).join("")}</table></div>`;
+  `<div class="card"><form class="row" data-form="addbus"><label>From<input name="from" required></label><label>To<input name="to" required></label><label>Departure<input name="time" type="time" required></label><label>Base fare (AC seater) ₹<input name="fare" type="number" required></label><label>Bus type<select name="type"><option>Non-AC</option><option>AC</option><option>Volvo Multi-Axle</option></select></label><button class="btn">Add bus</button></form><p class="sub fare-note">Ticket fares use this base fare: Non-AC 85%, AC 100%, Volvo 130%; Sleeper seats add 40%.</p><div id="am"></div></div>
+  <div class="card tbl"><table><tr><th>Bus</th><th>Route</th><th>Departs</th><th>Bus type</th><th>Seats</th><th>Base fare</th><th></th></tr>${S.buses.map((b) => `<tr><td>${b.id}</td><td>${esc(b.from)} → ${esc(b.to)}</td><td>${b.time}</td><td>${esc(RR.busTypeOf(b))}</td><td>${b.seats}</td><td>${inr(b.fare)}</td><td><button class="btn s g" data-act="delbus" data-id="${b.id}">Remove</button></td></tr>`).join("")}</table></div>`;
 
 function aRep() {
   const t = RR.stats(S), rows = Object.entries(t.byRoute), mx = Math.max(1, ...rows.map((r) => r[1])), sp = Math.max(t.revenue, t.refunds, 1);
@@ -147,8 +156,8 @@ document.addEventListener("click", (e) => {
   const a = e.target.closest("[data-act]"); if (!a) return; const d = a.dataset;
   try {
     if (d.act === "logout") { sessionStorage.removeItem("rr_u"); me = null; location.hash = "#/"; render(); }
-    else if (d.act === "route") { sv.from = d.f; sv.to = d.t; sv.bus = null; location.hash = "#/p/search"; render(); }
-    else if (d.act === "pick") { sv.bus = d.id; sv.seat = null; drawBox(true); }
+    else if (d.act === "route") { sv.from = d.f; sv.to = d.t; sv.bus = null; sv.seat = null; sv.seatType = "Seater"; sv.busType = "Any"; location.hash = "#/p/search"; render(); }
+    else if (d.act === "pick") { sv.bus = d.id; sv.seat = null; sv.seatType = "Seater"; drawBox(true); }
     else if (d.act === "seat") { sv.seat = Number(d.n); drawBox(); }
     else if (d.act === "cancel") { const b = RR.cancel(S, me, d.id); save(); render(); flash("#cm", `Ticket ${b.id} cancelled. Refund: ${inr(b.refund)}`, "k"); }
     else if (d.act === "delbus") { RR.deleteBus(S, me, d.id); save(); render(); }
@@ -161,6 +170,14 @@ document.addEventListener("click", (e) => {
   } catch (x) { flash("#cm", x.message); flash("#am", x.message); }
 });
 
+document.addEventListener("change", (e) => {
+  if (e.target.name !== "seatType") return;
+  const b = S.buses.find((x) => x.id === sv.bus);
+  if (!b) return;
+  sv.seatType = e.target.value;
+  $("#booking-fare").textContent = inr(RR.fareFor(b, sv.seatType));
+});
+
 document.addEventListener("submit", async (e) => {
   const f = e.target.dataset.form; if (!f) return; e.preventDefault();
   const d = Object.fromEntries(new FormData(e.target));
@@ -168,9 +185,9 @@ document.addEventListener("submit", async (e) => {
     if (f === "login" || f === "register") {
       me = f === "login" ? await RR.login(S, d.email, d.password) : await RR.register(S, d);
       save(); sessionStorage.setItem("rr_u", me.id); location.hash = me.role === "admin" ? "#/a/dashboard" : "#/p/dashboard"; render();
-    } else if (f === "search") { Object.assign(sv, { from: d.from, to: d.to, date: d.date, bus: null, seat: null }); runSearch(); }
+    } else if (f === "search") { Object.assign(sv, { from: d.from, to: d.to, date: d.date, bus: null, seat: null, seatType: "Seater", busType: d.busType }); runSearch(); }
     else if (f === "book") {
-      const bk = RR.book(S, me, { bus: sv.bus, date: sv.date, seat: sv.seat, name: d.name, phone: d.phone }); save(); sv.seat = null;
+      const bk = RR.book(S, me, { bus: sv.bus, date: sv.date, seat: sv.seat, seatType: d.seatType, name: d.name, phone: d.phone }); save(); sv.seat = null;
       runSearch(); flash("#bm", `Booked! Your ticket ID is ${bk.id}. See My Bookings.`, "k");
     } else if (f === "addbus") { const b = RR.addBus(S, me, d); save(); render(); flash("#am", `Bus ${b.id} added and passengers notified.`, "k"); }
   } catch (x) { flash("#am", x.message); flash("#bm", x.message); }

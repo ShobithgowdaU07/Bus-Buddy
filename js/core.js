@@ -1,6 +1,9 @@
 /* BUS BUDDY core logic: pure functions, shared by the browser app and the Node test suite */
 (function (root) {
   const REFUND_RATE = 0.8;
+  const DEFAULT_BUS_SEATS = 40;
+  const BUS_TYPE_MULTIPLIERS = { "Non-AC": 0.85, AC: 1, "Volvo Multi-Axle": 1.3 };
+  const SEAT_TYPE_MULTIPLIERS = { Seater: 1, Sleeper: 1.4 };
   const H = { admin: "e86f78a8a3caf0b60d8e74e5942aa6d86dc150cd3c03338aef25b7d2d7e3acc7",
               demo: "ff96673205dc722320598ebf8f88325b2ac56922d5a2164b5765868274bc0d73" };
   const err = (m) => { throw new Error(m); };
@@ -13,9 +16,9 @@
   }
 
   function newState() {
-    const bus = (id, from, to, time, fare, type) => ({ id, from, to, time, fare, seats: 20, type });
+    const bus = (id, from, to, time, fare, type) => ({ id, from, to, time, fare, seats: DEFAULT_BUS_SEATS, type });
     return {
-      n: 1001, nb: 106, nu: 3,
+      n: 1001, nb: 114, nu: 3, busCatalogVersion: 1,
       users: [
         { id: 1, name: "Mess Head Admin", email: "admin@routerider.com", phone: "9000000001", role: "admin", hash: H.admin },
         { id: 2, name: "Aarav Sharma", email: "demo@routerider.com", phone: "9811010000", role: "passenger", hash: H.demo }],
@@ -30,7 +33,8 @@
         bus("B109", "Bengaluru", "Ooty", "08:00", 680, "AC Seater"),
         bus("B110", "Bengaluru", "Kochi", "20:30", 980, "AC Sleeper"),
         bus("B111", "Chennai", "Bengaluru", "20:15", 650, "AC Sleeper"),
-        bus("B112", "Hyderabad", "Bengaluru", "21:00", 900, "Volvo Multi-Axle")],
+        bus("B112", "Hyderabad", "Bengaluru", "21:00", 900, "Volvo Multi-Axle"),
+        bus("B113", "Bengaluru", "Mysuru", "07:00", 350, "Non-AC")],
       bookings: [], notes: [],
     };
   }
@@ -55,15 +59,32 @@
     return u;
   }
 
-  function search(S, from, to) {
+  function search(S, from, to, busType = "Any") {
     if (!from || !to) err("Source and destination are required.");
     if (from === to) err("Source and destination cannot be the same.");
-    return S.buses.filter((b) => b.from === from && b.to === to);
+    if (!["Any", "AC", "Non-AC"].includes(busType)) err("Choose a valid bus type.");
+    return S.buses.filter((b) => {
+      if (b.from !== from || b.to !== to) return false;
+      const type = busTypeOf(b);
+      return busType === "Any" || (busType === "AC" ? type === "AC" || type === "Volvo Multi-Axle" : type === busType);
+    });
+  }
+
+  function busTypeOf(bus) {
+    if (bus.type === "AC Seater" || bus.type === "AC Sleeper") return "AC";
+    return bus.type;
+  }
+
+  function fareFor(bus, seatType) {
+    const type = busTypeOf(bus);
+    if (!Object.prototype.hasOwnProperty.call(BUS_TYPE_MULTIPLIERS, type)) err("Invalid bus type.");
+    if (!Object.prototype.hasOwnProperty.call(SEAT_TYPE_MULTIPLIERS, seatType)) err("Please choose a valid seat type.");
+    return Math.round(bus.fare * BUS_TYPE_MULTIPLIERS[type] * SEAT_TYPE_MULTIPLIERS[seatType]);
   }
 
   const taken = (S, id, date) => S.bookings.filter((b) => b.bus === id && b.date === date && b.status === "CONFIRMED").map((b) => b.seat);
 
-  function book(S, user, { bus, date, seat, name, phone }) {
+  function book(S, user, { bus, date, seat, seatType = "Seater", name, phone }) {
     const b = S.buses.find((x) => x.id === bus) || err("Bus not found.");
     if (!user || user.role !== "passenger") err("Only passengers can book tickets.");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || "") || isNaN(new Date(date))) err("Date must be in YYYY-MM-DD format.");
@@ -73,7 +94,8 @@
     seat = Number(seat);
     if (!Number.isInteger(seat) || seat < 1 || seat > b.seats) err("Please pick a valid seat.");
     if (taken(S, bus, date).includes(seat)) err("Seat " + seat + " is already booked.");
-    const bk = { id: "T" + S.n++, uid: user.id, bus, date, seat, name: name.trim(), phone: phone.trim(), fare: b.fare, status: "CONFIRMED", refund: 0 };
+    const fare = fareFor(b, seatType);
+    const bk = { id: "T" + S.n++, uid: user.id, bus, date, seat, seatType, name: name.trim(), phone: phone.trim(), fare, status: "CONFIRMED", refund: 0 };
     S.bookings.push(bk);
     note(S, user.id, `Ticket ${bk.id} confirmed: ${b.from} to ${b.to} on ${date}, seat ${seat}.`);
     return bk;
@@ -95,7 +117,9 @@
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time || "")) err("Enter departure time as HH:MM.");
     fare = Number(fare);
     if (!(fare > 0 && fare <= 10000)) err("Fare must be between 1 and 10000.");
-    const b = { id: "B" + S.nb++, from, to, time, fare, seats: 20, type: type || "AC Seater" };
+    type = busTypeOf({ type: type || "AC" });
+    if (!Object.prototype.hasOwnProperty.call(BUS_TYPE_MULTIPLIERS, type)) err("Choose a valid bus type.");
+    const b = { id: "B" + S.nb++, from, to, time, fare, seats: DEFAULT_BUS_SEATS, type };
     S.buses.push(b);
     S.users.filter((u) => u.role === "passenger").forEach((u) => note(S, u.id, `New bus ${b.id}: ${from} to ${to} at ${time}, Rs.${fare}.`));
     return b;
@@ -113,10 +137,10 @@
     const byRoute = {};
     ok.forEach((b) => { const x = S.buses.find((v) => v.id === b.bus); const k = x ? x.from + " - " + x.to : b.bus; byRoute[k] = (byRoute[k] || 0) + 1; });
     const revenue = ok.reduce((a, b) => a + b.fare, 0), refunds = no.reduce((a, b) => a + b.refund, 0);
-    const cap = Math.max(S.buses.length * 20, 1);
+    const cap = Math.max(S.buses.reduce((total, b) => total + b.seats, 0), 1);
     return { total: S.bookings.length, confirmed: ok.length, cancelled: no.length, revenue, refunds, byRoute, occupancy: Math.round((ok.length / cap) * 1000) / 10 };
   }
 
-  root.RR = { REFUND_RATE, newState, register, login, search, taken, book, cancel, addBus, deleteBus, stats, note, today, sha };
+  root.RR = { REFUND_RATE, DEFAULT_BUS_SEATS, BUS_TYPE_MULTIPLIERS, SEAT_TYPE_MULTIPLIERS, newState, register, login, search, busTypeOf, fareFor, taken, book, cancel, addBus, deleteBus, stats, note, today, sha };
   if (typeof module !== "undefined") module.exports = root.RR;
 })(typeof window !== "undefined" ? window : globalThis);
